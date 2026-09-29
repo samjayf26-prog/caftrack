@@ -10,7 +10,7 @@ A personal, zero-dependency web clone of [CafTrack](https://www.caftrack.app/), 
 - **Sleep readiness**: bedtime, time until sleep, and projected mg at bedtime versus your sleep target.
 - **Set Bedtime** modal with 9 PM / 10 PM / 11 PM / 12 AM presets, custom time and live projection.
 - **Add intake**: Just now, 1 hour ago, Earlier today (8:00 AM) or an exact date and time (with Today / Yesterday / N days ago shortcuts).
-- **Drink database** of ~280 coffees, teas, energy drinks, sodas and other sources, plus 5 favorites and your 5 most recent drinks. Search matches name or category and highlights the match.
+- **Drink database** of ~270 coffees, teas, energy drinks, sodas and other sources, plus 5 favorites and your 5 most recent drinks. Search matches name or category and highlights the match.
 - **Portion consumed** slider (10 to 100%) and **custom drinks**.
 - **Intake history** with 24h / 3 Days / Week / All ranges, delete with **undo**.
 - **Caffeine Levels chart**: decay curve with daily-limit, sleep-target and bedtime lines, plus a tooltip (mg, status, "Intake detected", % of limit). The daily limit is editable right on the chart.
