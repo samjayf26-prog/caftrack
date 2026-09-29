@@ -1,12 +1,25 @@
 /* Drink database.
  * Values are approximate caffeine amounts compiled from brand nutrition pages and
- * public caffeine references. Rows: [name, category, serving fl oz, caffeine mg].
+ * public caffeine references. Rows: [name, category, serving fl oz, mg, extra?].
  * Category is one of coffee | tea | energy | soda | other.
+ * extra (optional): { unit: 'pouch' | 'pill' | ..., substance: 'paraxanthine' }.
+ * Rows without a substance are caffeine.
  */
 (function () {
   'use strict';
 
+  var PILL = { unit: '1 pill' };
+  var MINT = { unit: '1 mint' };
+  var POUCH = { unit: '1 pouch' };
+  var PX_POUCH = { unit: '1 pouch', substance: 'paraxanthine' };
+
   var FEATURED = [
+    // Personal staples
+    ['Caffeine Pill (100 mg)', 'other', 0, 100, PILL],
+    ['Caffeine Mint (80 mg)', 'other', 0, 80, MINT],
+    ['Caffeine Pouch (180 mg)', 'other', 0, 180, POUCH],
+    ['Ultra Focus Pouch (Paraxanthine)', 'other', 0, 100, PX_POUCH],
+    // CafTrack's default favorites
     ['Brewed Coffee (8 oz)', 'coffee', 8, 95],
     ['Latte (8 oz)', 'coffee', 8, 63],
     ['Black Tea (8 oz)', 'tea', 8, 47],
@@ -285,9 +298,15 @@
     ['Coffee Ice Cream (1/2 cup)', 'other', 4, 30],
     ['Chocolate-Covered Coffee Beans (10)', 'other', 0.5, 60],
     ['Tiramisu (1 slice)', 'other', 4, 30],
-    ['Caffeine Pill (100 mg)', 'other', 0, 100],
-    ['Caffeine Pill (200 mg)', 'other', 0, 200],
+    ['Caffeine Pill (200 mg)', 'other', 0, 200, PILL],
+    ['Caffeine Pill (50 mg)', 'other', 0, 50, PILL],
     ['NoDoz (1 tablet)', 'other', 0, 200],
+    ['Caffeine Mint (40 mg)', 'other', 0, 40, MINT],
+    ['Caffeine Pouch (100 mg)', 'other', 0, 100, POUCH],
+    ['Caffeine Pouch (150 mg)', 'other', 0, 150, POUCH],
+    ['Ultra Energy Pouch', 'other', 0, 180, POUCH],
+    ['Ultra Focus Pouch (Pre-2026, 75 mg Paraxanthine)', 'other', 0, 75, PX_POUCH],
+    ['Paraxanthine Capsule (200 mg)', 'other', 0, 200, { unit: '1 capsule', substance: 'paraxanthine' }],
     ['Excedrin Migraine (2 tablets)', 'other', 0, 130],
     ['Run Gum (1 piece)', 'other', 0, 50],
     ['Military Energy Gum (1 piece)', 'other', 0, 100],
@@ -309,17 +328,20 @@
   ROWS.forEach(function (r) { nameCounts[r[0]] = (nameCounts[r[0]] || 0) + 1; });
 
   function toDrink(row, prefix) {
-    var name = row[0], category = row[1], oz = row[2], mg = row[3];
+    var name = row[0], category = row[1], oz = row[2], mg = row[3], extra = row[4] || {};
     var serving = oz > 0 ? { oz: oz, ml: Math.round(oz * 29.5735) } : null;
     // Names shared by several sizes get the size appended so they stay distinguishable.
     var displayName = !prefix && serving && nameCounts[name] > 1 ? name + ' (' + fmtOz(oz) + ' oz)' : name;
-    return {
+    var drink = {
       id: (prefix || '') + slug(name) + (serving ? '-' + serving.ml + 'ml' : ''),
       name: displayName,
       category: category,
       serving: serving,
       caffeineMg: mg
     };
+    if (extra.unit) drink.unit = extra.unit;
+    if (extra.substance) drink.substance = extra.substance;
+    return drink;
   }
 
   window.CT = window.CT || {};

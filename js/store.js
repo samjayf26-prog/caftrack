@@ -52,7 +52,7 @@
     var ts = Date.parse(i.timestamp);
     var amount = Number(i.amount);
     if (!isFinite(ts) || !isFinite(amount) || amount < 0) return null;
-    return {
+    var out = {
       id: i.id || i.clientId || newId(),
       name: String(i.name || 'Caffeine').slice(0, 120),
       amount: Math.round(amount),
@@ -60,6 +60,8 @@
       timestamp: new Date(ts).toISOString(),
       updatedAt: isFinite(i.updatedAt) ? i.updatedAt : ts
     };
+    if (i.substance && i.substance !== 'caffeine' && CT.model.SUBSTANCES[i.substance]) out.substance = i.substance;
+    return out;
   }
 
   function loadIntakes() {

@@ -69,8 +69,18 @@
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + time;
   }
 
+  function mgText(amount, substance) {
+    var short = M.substanceMeta(substance).short;
+    return amount + ' mg' + (short ? ' ' + short : '');
+  }
+
   function servingText(d) {
     var parts = [];
+    if (d.unit) {
+      parts.push(d.unit);
+      parts.push(M.substanceMeta(d.substance).label);
+      return parts.join(' • ');
+    }
     if (d.serving) {
       var oz = d.serving.oz;
       parts.push((Number.isInteger(oz) ? oz.toFixed(0) : oz.toFixed(1)) + ' oz');
@@ -111,14 +121,14 @@
   function addIntake(entry) {
     var it = S.sanitizeIntake({
       id: S.newId(), name: entry.name, amount: entry.amount, category: entry.category,
-      timestamp: entry.timestamp, updatedAt: Date.now()
+      substance: entry.substance, timestamp: entry.timestamp, updatedAt: Date.now()
     });
     if (!it) return;
     state.intakes.push(it);
     sortIntakes();
     persistIntakes();
     renderData();
-    showToast('Logged “' + it.name + '”', it.amount + ' mg · ' + fmtWhen(it.timestamp));
+    showToast('Logged “' + it.name + '”', mgText(it.amount, it.substance) + ' · ' + fmtWhen(it.timestamp));
   }
 
   function removeIntake(id) {
@@ -235,7 +245,7 @@
       '<div class="cat-icon cat-' + cat.tone + '">' + icon(cat.icon, 16) + '</div>' +
       '<div class="intake-main"><div class="intake-name" title="' + esc(it.name) + '">' + esc(it.name) + '</div>' +
       '<div class="intake-time">' + esc(fmtWhen(it.timestamp)) + '</div></div>' +
-      '<div class="intake-mg">' + it.amount + ' mg</div>' +
+      '<div class="intake-mg"' + (it.substance ? ' title="' + M.substanceMeta(it.substance).label + '"' : '') + '>' + mgText(it.amount, it.substance) + '</div>' +
       '<button type="button" class="del-btn" data-action="delete-intake" data-id="' + esc(it.id) + '" aria-label="Remove ' + esc(it.name) + '">' + icon('x', 18) + '</button>' +
       '</div>';
   }
@@ -333,7 +343,9 @@
       '<form class="glass custom-card" data-custom-form novalidate>' +
       '<div class="custom-divider">Custom Drink</div>' +
       '<div class="field"><label for="custom-name">Drink name</label><input class="input" id="custom-name" name="name" maxlength="80" autocomplete="off"></div>' +
-      '<div class="field"><label for="custom-mg">Caffeine amount (mg)</label><input class="input" id="custom-mg" name="mg" type="number" min="1" max="2000" inputmode="numeric"></div>' +
+      '<div class="field"><label for="custom-mg">Amount (mg)</label><input class="input" id="custom-mg" name="mg" type="number" min="1" max="2000" inputmode="numeric"></div>' +
+      '<div class="field"><label for="custom-substance">Stimulant</label><select class="input" id="custom-substance" name="substance">' +
+      '<option value="caffeine">Caffeine</option><option value="paraxanthine">Paraxanthine (clears faster)</option></select></div>' +
       '<p class="form-error" data-custom-error hidden></p>' +
       '<button type="submit" class="btn btn-primary btn-block">' + icon('plus', 16) + 'Log custom drink</button>' +
       '</form>';
@@ -402,7 +414,10 @@
     q = q.trim().toLowerCase();
     if (!q) return [];
     var matches = ALL_DRINKS.filter(function (d) {
-      return d.name.toLowerCase().indexOf(q) >= 0 || M.categoryMeta(d.category).label.toLowerCase().indexOf(q) >= 0;
+      return d.name.toLowerCase().indexOf(q) >= 0 ||
+        M.categoryMeta(d.category).label.toLowerCase().indexOf(q) >= 0 ||
+        (d.substance && M.substanceMeta(d.substance).label.toLowerCase().indexOf(q) >= 0) ||
+        (d.unit && d.unit.indexOf(q) >= 0);
     });
     matches.sort(function (a, b) {
       var ai = a.name.toLowerCase().indexOf(q), bi = b.name.toLowerCase().indexOf(q);
@@ -425,7 +440,7 @@
     var row = '<button type="button" class="drink-row" data-action="select-drink" data-id="' + esc(d.id) + '" aria-pressed="' + sel + '">' +
       '<span><span class="drink-name">' + highlight(d.name, q || '') + '</span>' +
       '<span class="drink-meta" style="display:block">' + esc(servingText(d)) + '</span></span>' +
-      '<span class="drink-mg">' + d.caffeineMg + ' mg</span></button>';
+      '<span class="drink-mg">' + mgText(d.caffeineMg, d.substance) + '</span></button>';
     return sel ? row + confirmHtml(d) : row;
   }
 
@@ -434,7 +449,7 @@
     return '<div class="confirm" data-confirm>' +
       '<div class="confirm-head"><div><div class="drink-name">' + esc(d.name) + '</div><div class="drink-meta">' + esc(servingText(d)) + '</div></div>' +
       '<button type="button" class="close-btn" data-action="clear-selection" aria-label="Clear selection">' + icon('x', 16) + '</button></div>' +
-      '<div class="portion-row"><label for="portion-range">Portion consumed</label><strong data-portion-label>' + p + '% · ' + Math.round(d.caffeineMg * p / 100) + ' mg</strong></div>' +
+      '<div class="portion-row"><label for="portion-range">Portion consumed</label><strong data-portion-label>' + p + '% · ' + mgText(Math.round(d.caffeineMg * p / 100), d.substance) + '</strong></div>' +
       '<input class="range" id="portion-range" type="range" min="10" max="100" step="5" value="' + p + '" data-portion>' +
       '<div class="portion-quick">' + [10, 25, 50, 75, 100].map(function (v) {
         return '<button type="button" class="chip" data-action="portion" data-value="' + v + '" aria-pressed="' + (p === v) + '">' + v + '%</button>';
@@ -448,7 +463,7 @@
     if (!d) return;
     var p = state.add.portion;
     var lbl = $('[data-portion-label]', addPanel);
-    if (lbl) lbl.textContent = p + '% · ' + Math.round(d.caffeineMg * p / 100) + ' mg';
+    if (lbl) lbl.textContent = p + '% · ' + mgText(Math.round(d.caffeineMg * p / 100), d.substance);
     var range = $('[data-portion]', addPanel);
     if (range && +range.value !== p) range.value = p;
     $$('.portion-quick .chip', addPanel).forEach(function (c) {
@@ -506,6 +521,7 @@
       name: d.name + (p !== 100 ? ' (' + p + '%)' : ''),
       amount: Math.max(0, Math.round(d.caffeineMg * p / 100)),
       category: d.category,
+      substance: d.substance,
       timestamp: chosenTimestamp()
     });
     state.recent = [d.id].concat(state.recent.filter(function (x) { return x !== d.id; })).slice(0, 5);
@@ -524,7 +540,8 @@
     err.hidden = !msg;
     err.textContent = msg;
     if (msg) return;
-    addIntake({ name: name, amount: Math.round(mg), category: 'other', timestamp: chosenTimestamp() });
+    var substance = form.elements.substance.value;
+    addIntake({ name: name, amount: Math.round(mg), category: 'other', substance: substance === 'caffeine' ? undefined : substance, timestamp: chosenTimestamp() });
     form.reset();
     if (topModal() === 'add') closeModal();
   }
@@ -729,6 +746,9 @@
       '<p>Health authorities such as the FDA and EFSA consider up to 400 mg a day safe for most healthy adults, roughly four 8 oz cups of brewed coffee. During pregnancy the usual guidance is 200 mg a day or less. Single doses above about 200 mg are more likely to cause jitters or a racing heart.</p>' +
       '<h3>' + icon('moon', 18) + 'Caffeine and sleep</h3>' +
       '<p>Caffeine can delay sleep and reduce deep sleep even when you do not feel wired. A common rule is to stop 6–8 hours before bed. CafTrack projects your level at bedtime so you can aim for your sleep target (30 mg by default).</p>' +
+      '<h3>' + icon('leaf', 18) + 'Paraxanthine</h3>' +
+      '<p>Paraxanthine is the main compound your liver turns caffeine into (about 80% of it). It blocks adenosine receptors about as strongly as caffeine, so it keeps you alert in a similar way, but it clears faster: roughly a 3.1-hour half-life versus 4.1 hours for caffeine in the same people. Some supplements and pouches (such as Ultra Focus) contain it instead of caffeine.</p>' +
+      '<p>CafTrack counts paraxanthine toward your level and bedtime projection (marked “PX”), decaying about 24% faster than your caffeine half-life. Human sleep studies on paraxanthine supplements are still limited, so treat its sleep effect as similar to caffeine until proven otherwise.</p>' +
       '<p class="disclaimer">Estimates only, based on published averages. This app is not a medical device; individual responses vary, so talk to a clinician about your own limits.</p>' +
       '</div>';
   }

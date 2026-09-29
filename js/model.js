@@ -8,6 +8,16 @@
 
   var HALF_LIVES = { fast: 4, average: 5.5, slow: 7.5 };
 
+  // Paraxanthine (caffeine's main metabolite) blocks adenosine receptors about as strongly as
+  // caffeine but clears faster: 3.1 h vs 4.1 h half-life measured in the same subjects
+  // (Lelo et al., 1986). Both go through CYP1A2, so personal factors scale them together.
+  var SUBSTANCES = {
+    caffeine: { label: 'Caffeine', short: '', halfLifeRatio: 1 },
+    paraxanthine: { label: 'Paraxanthine', short: 'PX', halfLifeRatio: 3.1 / 4.1 }
+  };
+
+  function substanceMeta(s) { return SUBSTANCES[s] || SUBSTANCES.caffeine; }
+
   var DEFAULT_SETTINGS = {
     metabolismRate: 'average',
     caffeineLimit: 200,
@@ -52,7 +62,8 @@
 
   function decayConstant(s) { return Math.LN2 / (halfLifeHours(s) * HOUR); }
 
-  // Instant absorption, exponential elimination.
+  // Instant absorption, exponential elimination. k is caffeine's rate; other substances
+  // decay at k divided by their half-life ratio. Returns the combined stimulant load (mg).
   function levelAt(intakes, t, k) {
     var sum = 0;
     for (var i = 0; i < intakes.length; i++) {
@@ -60,7 +71,7 @@
       var amt = Number(intakes[i].amount);
       if (!isFinite(ti) || !isFinite(amt)) continue;
       var dt = t - ti;
-      if (dt >= 0) sum += amt * Math.exp(-k * dt);
+      if (dt >= 0) sum += amt * Math.exp(-k / substanceMeta(intakes[i].substance).halfLifeRatio * dt);
     }
     return sum;
   }
@@ -171,6 +182,8 @@
     RANGES: RANGES,
     CATEGORIES: CATEGORIES,
     categoryMeta: categoryMeta,
+    SUBSTANCES: SUBSTANCES,
+    substanceMeta: substanceMeta,
     findRange: findRange,
     halfLifeHours: halfLifeHours,
     decayConstant: decayConstant,
