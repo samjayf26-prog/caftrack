@@ -32,6 +32,10 @@
     oralContraceptivesAdjustment: false,
     lastCallDrinkId: 'featured-caffeine-pill-100-mg',
     showWindDown: true,
+    dailyDoseEnabled: true,
+    dailyDoseStart: '12:00',
+    dailyDoseEnd: '14:00',
+    dailyDoseDrinkId: 'featured-caffeine-pill-100-mg',
     updatedAt: 0
   };
 

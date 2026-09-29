@@ -291,6 +291,22 @@ body.dark .lc-icon { background: #ffffff14; }
 .lc-soon { color: var(--amber-strong); }
 .lc-closed { color: var(--rose-text); }
 .lc-change { font-size: .75rem; }
+.dd { padding: 12px 14px; border-radius: 14px; margin-bottom: 12px; border: 1px solid var(--inner-border); background: var(--inner); }
+.dd-ok { border-color: #10b98159; }
+.dd-soon { border-color: #f59e0b80; background: var(--amber-bg); }
+.dd-closed { border-color: #f43f5e66; background: var(--rose-bg); }
+.dd-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dd-label { display: flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--text-2); }
+.dd-state { font-size: .85rem; font-weight: 600; }
+.dd-ok .dd-state { color: var(--emerald-strong); }
+.dd-idle .dd-state { color: var(--text-2); }
+.dd-soon .dd-state { color: var(--amber-text); }
+.dd-closed .dd-state { color: var(--rose-text); }
+.dd-plan { font-size: .8rem; color: var(--text-2); margin-top: 6px; line-height: 1.45; }
+.dd-log { height: 34px; margin-top: 10px; width: 100%; font-size: .85rem; }
+.dd-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.panel label.t { display: block; font-weight: 600; font-size: .8rem; margin-bottom: 6px; color: var(--text-2); }
+.panel .hint { font-size: .75rem; color: var(--muted); margin-top: 8px; }
 .winddown-card { padding: 20px; }
 .wd-moon { width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #ede9fe; color: #6d28d9; }
 body.dark .wd-moon { background: #4c1d9566; color: #c4b5fd; }

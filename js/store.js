@@ -55,6 +55,10 @@
       smokerAdjustment: s.smokerAdjustment === true,
       oralContraceptivesAdjustment: s.oralContraceptivesAdjustment === true,
       showWindDown: s.showWindDown !== false,
+      dailyDoseEnabled: s.dailyDoseEnabled !== false,
+      dailyDoseStart: /^\d{2}:\d{2}$/.test(s.dailyDoseStart || '') ? s.dailyDoseStart : d.dailyDoseStart,
+      dailyDoseEnd: /^\d{2}:\d{2}$/.test(s.dailyDoseEnd || '') ? s.dailyDoseEnd : d.dailyDoseEnd,
+      dailyDoseDrinkId: typeof s.dailyDoseDrinkId === 'string' ? (RENAMED_IDS[s.dailyDoseDrinkId] || s.dailyDoseDrinkId) : d.dailyDoseDrinkId,
       lastCallDrinkId: typeof s.lastCallDrinkId === 'string' ? (RENAMED_IDS[s.lastCallDrinkId] || s.lastCallDrinkId) : d.lastCallDrinkId,
       updatedAt: isFinite(s.updatedAt) ? s.updatedAt : 0
     };

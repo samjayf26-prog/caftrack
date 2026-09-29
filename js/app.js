@@ -262,6 +262,8 @@
     return (ds === localDateStr(tomorrow) ? 'Tomorrow ' : ds === daysAgoStr(1) ? 'Yesterday ' : '') + time;
   }
 
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
   function sameDay(a, b) { return localDateStr(new Date(a)) === localDateStr(new Date(b)); }
 
   function doseLabel(d) {
@@ -275,33 +277,138 @@
     return 'closed';
   }
 
+  // ---------- Daily dose (withdrawal prevention) ----------
+  function todayAt(hhmm, now) {
+    var t = M.parseTime(hhmm), d = new Date(now);
+    d.setHours(t[0], t[1], 0, 0);
+    return d.getTime();
+  }
+
+  function dailyDoseDrink() {
+    return DRINKS_BY_ID[state.settings.dailyDoseDrinkId] || DRINKS_BY_ID['featured-caffeine-pill-100-mg'];
+  }
+
+  // Today's required-dose window and whether it has been covered.
+  function dailyDose(now) {
+    var s = state.settings;
+    if (!s.dailyDoseEnabled) return null;
+    var start = todayAt(s.dailyDoseStart, now), end = todayAt(s.dailyDoseEnd, now);
+    if (end <= start) end += M.DAY;
+    var taken = state.intakes.filter(function (i) {
+      var t = Date.parse(i.timestamp);
+      return M.isStimulant(i) && t >= start && t <= end;
+    })[0];
+    var d = dailyDoseDrink();
+    var status = taken ? 'taken' : now < start ? 'upcoming' : now <= end ? 'due' : 'missed';
+    var planned = status === 'upcoming' || status === 'due' ?
+      { amount: d.caffeineMg, substance: d.substance, timestamp: new Date(Math.max(now, start)).toISOString() } : null;
+    return { start: start, end: end, drink: d, taken: taken, state: status, planned: planned };
+  }
+
+  // Logged intakes plus today's daily dose if it is still ahead, so every
+  // "extra dose" calculation leaves room for it.
+  function planIntakes(now, dd) {
+    dd = dd === undefined ? dailyDose(now) : dd;
+    return dd && dd.planned ? state.intakes.concat([dd.planned]) : state.intakes;
+  }
+
+  function dailyDoseHtml(dd, now) {
+    if (!dd) return '';
+    var s = state.settings, d = dd.drink;
+    var range = shortClock(dd.start) + '–' + shortClock(dd.end);
+    var tone, stateText;
+    if (dd.state === 'taken') {
+      tone = 'ok';
+      stateText = 'Taken ' + shortClock(Date.parse(dd.taken.timestamp)) + ' · ' + mgText(dd.taken.amount, dd.taken.substance);
+    } else if (dd.state === 'upcoming') {
+      tone = 'idle'; stateText = 'Due in ' + M.formatDuration(dd.start - now);
+    } else if (dd.state === 'due') {
+      tone = 'soon'; stateText = 'Take now · window closes ' + shortClock(dd.end);
+    } else {
+      tone = 'closed'; stateText = 'Missed · headache risk, a dose now still helps';
+    }
+
+    // Plan: when inside the window can this dose go and still meet the sleep target?
+    var plan = '';
+    if (dd.state === 'upcoming' || dd.state === 'due') {
+      var lc = M.lastCall(state.intakes, s, d.caffeineMg, d.substance, now);
+      var from = Math.max(now, dd.start);
+      if (lc.kind === 'anytime' || (lc.kind === 'open' && lc.time >= dd.end)) {
+        plan = 'Your ' + esc(d.name) + ' fits anywhere in the window for a ' + M.formatClock(s.sleepTime) + ' bedtime.';
+      } else if (lc.kind === 'open' && lc.time >= from) {
+        plan = 'Take the ' + esc(d.name) + ' by <strong>' + shortClock(lc.time) + '</strong> to land under ' + s.targetSleepCaffeine + ' mg at bedtime.';
+      } else {
+        var at = Math.round(M.projectedWithDose(state.intakes, s, d.caffeineMg, d.substance, from, now));
+        plan = 'Even at ' + shortClock(from) + ', the ' + esc(d.name) + ' leaves about ' + at + ' mg at bedtime (target ' + s.targetSleepCaffeine + ').';
+      }
+      var fitsWholeWindow = lc.kind === 'anytime' || (lc.kind === 'open' && lc.time >= dd.end);
+      var alt = fitsWholeWindow ? null : smallerDoseThatFits(d, dd.end, now);
+      if (alt) plan += ' The ' + esc(alt.name) + ' fits anywhere in the window.';
+    }
+
+    var logBtn = dd.state === 'due' || dd.state === 'missed' ?
+      '<button type="button" class="btn btn-primary dd-log" data-action="log-daily">' + icon('plus', 14) + 'Log ' + esc(d.name) + ' now</button>' : '';
+    return '<div class="dd dd-' + tone + '">' +
+      '<div class="dd-top"><span class="dd-label">' + icon('clock', 14) + 'Daily dose · ' + range + '</span>' +
+      '<span class="dd-state">' + stateText + '</span></div>' +
+      (plan ? '<p class="dd-plan">' + plan + '</p>' : '') + logBtn + '</div>';
+  }
+
+  // A caffeine staple that stays under the sleep target even at the end of the window.
+  // Only plain caffeine counts: it is unproven whether paraxanthine prevents caffeine withdrawal.
+  function smallerDoseThatFits(current, end, now) {
+    var s = state.settings;
+    var options = CT.FEATURED_DRINKS.filter(function (x) {
+      return x.id !== current.id && !x.substance && x.caffeineMg <= current.caffeineMg;
+    });
+    options.sort(function (a, b) { return b.caffeineMg - a.caffeineMg; });
+    for (var i = 0; i < options.length; i++) {
+      var r = M.lastCall(state.intakes, s, options[i].caffeineMg, options[i].substance, now);
+      if (r.kind === 'anytime' || (r.kind === 'open' && r.time >= end)) return options[i];
+    }
+    return null;
+  }
+
+  function logDailyDose() {
+    var d = dailyDoseDrink();
+    addIntake({ name: d.name, amount: d.caffeineMg, category: d.category, substance: d.substance, timestamp: new Date().toISOString() });
+    state.recent = [d.id].concat(state.recent.filter(function (x) { return x !== d.id; })).slice(0, 5);
+    S.saveRecent(state.recent);
+    renderDrinkList();
+  }
+
   function renderLastCall(m) {
     var s = state.settings, now = m.now;
     var d = headlineDrink();
-    var lc = M.lastCall(state.intakes, s, d.caffeineMg, d.substance, now);
+    var dd = dailyDose(now);
+    var planned = planIntakes(now, dd);
+    var lc = M.lastCall(planned, s, d.caffeineMg, d.substance, now);
     var tone = lastCallTone(lc, now);
     var target = s.targetSleepCaffeine;
+    var extra = dd && dd.planned;
+    var a = extra ? 'an extra ' : 'a ';
+    var onTop = extra ? ' on top of your daily dose' : '';
     var title, sub;
     if (lc.kind === 'open') {
       title = 'Last call ' + clockMs(lc.time);
-      sub = 'for a ' + doseLabel(d) + ' · ' + M.formatDuration(lc.time - now) + ' left';
+      sub = 'for ' + a + doseLabel(d) + ' · ' + M.formatDuration(lc.time - now) + ' left';
     } else if (lc.kind === 'closed') {
-      title = sameDay(lc.time, now) ? 'Last call was ' + clockMs(lc.time) : 'Closed for today';
-      sub = 'A ' + doseLabel(d) + ' now would leave ' + Math.round(lc.ifNow) + ' mg at bedtime (target ' + target + ')';
+      title = sameDay(lc.time, now) ? 'Last call was ' + clockMs(lc.time) : (extra ? 'No room for extras today' : 'Closed for today');
+      sub = cap(a) + doseLabel(d) + ' now would leave ' + Math.round(lc.ifNow) + ' mg at bedtime' + onTop + ' (target ' + target + ')';
     } else if (lc.kind === 'anytime') {
       title = 'No cutoff tonight';
-      sub = 'A ' + doseLabel(d) + ' stays under your ' + target + ' mg target even right before bed';
+      sub = cap(a) + doseLabel(d) + ' stays under your ' + target + ' mg target even right before bed';
     } else {
       title = 'Done for today';
-      sub = 'You’re already projected at ' + Math.round(lc.base) + ' mg at bedtime, over your ' + target + ' mg target';
+      sub = (extra ? 'With your daily dose you’re' : 'You’re already') + ' projected at ' + Math.round(lc.base) + ' mg at bedtime, over your ' + target + ' mg target';
     }
-    var budget = M.budgetNow(state.intakes, s, now);
+    var budget = M.budgetNow(planned, s, now);
     var budgetText = budget > 0 ?
       'Room right now: up to <strong>' + budget + ' mg</strong> of caffeine' :
       'No room left for caffeine before bed';
 
     var rows = lastCallDrinks().map(function (x) {
-      var r = M.lastCall(state.intakes, s, x.caffeineMg, x.substance, now);
+      var r = M.lastCall(planned, s, x.caffeineMg, x.substance, now);
       var t = lastCallTone(r, now);
       var txt = r.kind === 'open' ? 'until ' + clockMs(r.time) :
         r.kind === 'closed' ? (sameDay(r.time, now) ? 'closed ' + clockMs(r.time) : 'closed today') :
@@ -315,12 +422,14 @@
     var html =
       '<div class="lc-head"><h2 class="eyebrow-title">Last Call</h2>' +
       '<span class="lc-dot lc-dot-' + tone + '" aria-hidden="true"></span></div>' +
+      dailyDoseHtml(dd, now) +
       '<div class="lc-hero lc-hero-' + tone + '">' +
       '<div class="lc-icon">' + icon(tone === 'closed' ? 'alertTriangle' : 'clock', 20) + '</div>' +
       '<div><div class="lc-title">' + title + '</div><div class="lc-sub">' + sub + '</div></div></div>' +
       '<p class="lc-budget">' + budgetText + '</p>' +
       '<div class="lc-list" role="group" aria-label="Last call by item">' + rows + '</div>' +
-      '<p class="foot-note">Tap an item to make it your headline. Based on a ' + m.bedLabel +
+      '<p class="foot-note">' + (dd && dd.planned ? 'Extra doses above leave room for your planned daily dose. ' : '') +
+      'Tap an item to make it your headline. Based on a ' + m.bedLabel +
       ' bedtime and ' + target + ' mg target. <button type="button" class="link-btn lc-change" data-action="open-bedtime">Change</button></p>';
     $$('[data-lastcall]').forEach(function (el) { el.innerHTML = html; });
   }
@@ -478,7 +587,7 @@
     var s = state.settings;
     var series = M.chartSeries(state.intakes, s, state.range, m.now);
     var hd = headlineDrink();
-    var lc = M.lastCall(state.intakes, s, hd.caffeineMg, hd.substance, m.now);
+    var lc = M.lastCall(planIntakes(m.now), s, hd.caffeineMg, hd.substance, m.now);
     var lastCallT = lc.kind === 'open' || lc.kind === 'closed' ? lc.time : null;
     var showLc = lastCallT !== null && lastCallT >= series.start && lastCallT <= series.end;
     chartCards.forEach(function (c) {
@@ -671,10 +780,14 @@
     var t = Date.parse(chosenTimestamp());
     var bed = M.nextBedtime(s.sleepTime, now).getTime();
     if (t > bed) return icon('moon', 14) + '<span>Logged after tonight’s bedtime</span>';
-    var proj = Math.round(M.projectedWithDose(state.intakes, s, dose, d.substance, t, now));
+    // A dose logged inside the daily-dose window is that dose; otherwise leave room for it.
+    var dd = dailyDose(now);
+    var base = dd && dd.planned && !(t >= dd.start && t <= dd.end) ? planIntakes(now, dd) : state.intakes;
+    var proj = Math.round(M.projectedWithDose(base, s, dose, d.substance, t, now));
     var ok = proj <= s.targetSleepCaffeine;
     return '<span class="impact-' + (ok ? 'ok' : 'warn') + '">' + icon(ok ? 'check' : 'alertTriangle', 14) +
-      'At bedtime: ' + proj + ' mg ' + (ok ? '(within your ' : '(over your ') + s.targetSleepCaffeine + ' mg target)</span>';
+      'At bedtime: ' + proj + ' mg ' + (ok ? '(within your ' : '(over your ') + s.targetSleepCaffeine + ' mg target' +
+      (base !== state.intakes ? ', incl. your daily dose' : '') + ')</span>';
   }
 
   function updateImpact() {
@@ -865,6 +978,18 @@
       checkRow('smokerAdjustment', 'Smoker (faster metabolism)', d) +
       checkRow('oralContraceptivesAdjustment', 'Oral contraceptives (slower metabolism)', d) +
       '<p class="effective" data-effective>' + effectiveText(d) + '</p></div>' +
+      '<div class="panel"><h3>Daily Dose</h3>' +
+      checkRow('dailyDoseEnabled', 'I need a daily dose to avoid withdrawal headaches', d) +
+      '<div class="dd-settings"><div><label class="t" for="set-dd-start">From</label>' +
+      '<input class="input" type="time" id="set-dd-start" data-set="dailyDoseStart" value="' + d.dailyDoseStart + '"></div>' +
+      '<div><label class="t" for="set-dd-end">To</label>' +
+      '<input class="input" type="time" id="set-dd-end" data-set="dailyDoseEnd" value="' + d.dailyDoseEnd + '"></div></div>' +
+      '<label class="t" for="set-dd-item" style="margin-top:10px">Usual dose</label>' +
+      '<select class="input" id="set-dd-item" data-set="dailyDoseDrinkId">' +
+      CT.FEATURED_DRINKS.filter(function (x) { return !x.substance; }).map(function (x) {
+        return '<option value="' + esc(x.id) + '"' + (x.id === d.dailyDoseDrinkId ? ' selected' : '') + '>' + esc(x.name) + ' · ' + x.caffeineMg + ' mg</option>';
+      }).join('') + '</select>' +
+      '<p class="hint">Last Call leaves room for this dose, and the card reminds you inside the window.</p></div>' +
       '<div class="panel"><h3>Sleep Aids</h3>' +
       checkRow('showWindDown', 'Show the Wind-Down card (melatonin and magnesium timing)', d) + '</div>' +
       '<div class="panel"><h3>Appearance</h3><div class="row-between"><span>Dark Mode</span>' +
@@ -913,7 +1038,11 @@
       pregnancyAdjustment: d.pregnancyAdjustment,
       smokerAdjustment: d.smokerAdjustment,
       oralContraceptivesAdjustment: d.oralContraceptivesAdjustment,
-      showWindDown: d.showWindDown
+      showWindDown: d.showWindDown,
+      dailyDoseEnabled: d.dailyDoseEnabled,
+      dailyDoseStart: d.dailyDoseStart,
+      dailyDoseEnd: d.dailyDoseEnd,
+      dailyDoseDrinkId: d.dailyDoseDrinkId
     });
     closeModal();
     showToast('Settings saved');
@@ -978,6 +1107,9 @@
       '<h3>' + icon('leaf', 18) + 'Paraxanthine</h3>' +
       '<p>Paraxanthine is the main compound your liver turns caffeine into (about 80% of it). It blocks adenosine receptors about as strongly as caffeine, so it keeps you alert in a similar way, but it clears faster: roughly a 3.1-hour half-life versus 4.1 hours for caffeine in the same people. Some supplements and pouches (such as Ultra Focus) contain it instead of caffeine.</p>' +
       '<p>CafTrack counts paraxanthine toward your level and bedtime projection (marked “PX”), decaying about 24% faster than your caffeine half-life. Human sleep studies on paraxanthine supplements are still limited, so treat its sleep effect as similar to caffeine until proven otherwise.</p>' +
+      '<h3>' + icon('history', 18) + 'Tolerance and withdrawal</h3>' +
+      '<p>With daily use your body adapts: the usual dose stops feeling stimulating and mostly just keeps you at baseline. Skipping it can cause withdrawal, most often a headache, starting 12–24 hours after the last dose, peaking at 1–2 days and lasting 2–9 days. It can happen with habits as small as 100 mg a day.</p>' +
+      '<p>The Daily Dose setting marks the window you rely on and makes Last Call plan around it. If you ever want to cut back, reducing by about 10–25% every few days usually avoids the headache.</p>' +
       '<h3>' + icon('moon', 18) + 'Melatonin and magnesium</h3>' +
       '<p>Melatonin is best taken 30–60 minutes before bed: it starts working in 20–40 minutes and peaks about an hour after you take it. Low doses (0.5–3 mg) usually work as well as high ones with less next-day grogginess; 10 mg is a common upper limit. Sleep medicine guidelines don’t routinely recommend it for chronic insomnia, so expect a modest effect.</p>' +
       '<p>Magnesium (glycinate is gentlest on the stomach) is usually taken 30–60 minutes before bed. Evidence for sleep is limited and strongest in people who are low in magnesium; benefits build over 2+ weeks of nightly use. Keep supplements at or under 350 mg a day unless a clinician advises otherwise.</p>' +
@@ -1138,6 +1270,7 @@
         break;
       case 'select-drink': selectDrink(el.getAttribute('data-id')); break;
       case 'find-aid': openSearch(el.getAttribute('data-q')); break;
+      case 'log-daily': logDailyDose(); break;
       case 'set-lastcall': updateSettings({ lastCallDrinkId: el.getAttribute('data-id') }); break;
       case 'clear-selection':
         state.add.selectedId = null;
