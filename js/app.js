@@ -180,9 +180,11 @@
     renderHeader(m);
     renderSummary(m);
     renderMobileHome(m);
+    renderLastCall(m);
     renderRanges();
     renderHistory();
     renderCharts(m);
+    if (addPanel) updateImpact();
     if (topModal() === 'bedtime') updateBedtimeModal();
   }
 
@@ -229,6 +231,91 @@
       '<div>' + icon('trendingDown', 16, cls) + '<div class="v ' + cls + '">' + m.atSleep + ' mg</div><div class="l">At bedtime</div></div>' +
       '</div>' +
       '<p class="foot-note">Target: ' + s.targetSleepCaffeine + ' mg or less at bedtime</p>';
+  }
+
+  // ---------- Last call ----------
+  // The personal staples (favorites with a unit: pills, mints, pouches) plus whichever drink is chosen.
+  function lastCallDrinks() {
+    var list = CT.FEATURED_DRINKS.filter(function (d) { return d.unit; });
+    var chosen = DRINKS_BY_ID[state.settings.lastCallDrinkId];
+    if (chosen && list.indexOf(chosen) < 0) list.unshift(chosen);
+    return list;
+  }
+
+  function headlineDrink() {
+    return DRINKS_BY_ID[state.settings.lastCallDrinkId] || lastCallDrinks()[0];
+  }
+
+  function clockMs(t) {
+    var d = new Date(t);
+    var time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    var ds = localDateStr(d), today = localDateStr(new Date());
+    if (ds === today) return time;
+    var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    return (ds === localDateStr(tomorrow) ? 'Tomorrow ' : ds === daysAgoStr(1) ? 'Yesterday ' : '') + time;
+  }
+
+  function sameDay(a, b) { return localDateStr(new Date(a)) === localDateStr(new Date(b)); }
+
+  function doseLabel(d) {
+    var unit = d.unit ? d.unit.replace(/^1 /, '') : 'serving';
+    return mgText(d.caffeineMg, d.substance) + ' ' + unit;
+  }
+
+  function lastCallTone(lc, now) {
+    if (lc.kind === 'anytime') return 'ok';
+    if (lc.kind === 'open') return lc.time - now <= M.HOUR ? 'soon' : 'ok';
+    return 'closed';
+  }
+
+  function renderLastCall(m) {
+    var s = state.settings, now = m.now;
+    var d = headlineDrink();
+    var lc = M.lastCall(state.intakes, s, d.caffeineMg, d.substance, now);
+    var tone = lastCallTone(lc, now);
+    var target = s.targetSleepCaffeine;
+    var title, sub;
+    if (lc.kind === 'open') {
+      title = 'Last call ' + clockMs(lc.time);
+      sub = 'for a ' + doseLabel(d) + ' · ' + M.formatDuration(lc.time - now) + ' left';
+    } else if (lc.kind === 'closed') {
+      title = sameDay(lc.time, now) ? 'Last call was ' + clockMs(lc.time) : 'Closed for today';
+      sub = 'A ' + doseLabel(d) + ' now would leave ' + Math.round(lc.ifNow) + ' mg at bedtime (target ' + target + ')';
+    } else if (lc.kind === 'anytime') {
+      title = 'No cutoff tonight';
+      sub = 'A ' + doseLabel(d) + ' stays under your ' + target + ' mg target even right before bed';
+    } else {
+      title = 'Done for today';
+      sub = 'You’re already projected at ' + Math.round(lc.base) + ' mg at bedtime, over your ' + target + ' mg target';
+    }
+    var budget = M.budgetNow(state.intakes, s, now);
+    var budgetText = budget > 0 ?
+      'Room right now: up to <strong>' + budget + ' mg</strong> of caffeine' :
+      'No room left for caffeine before bed';
+
+    var rows = lastCallDrinks().map(function (x) {
+      var r = M.lastCall(state.intakes, s, x.caffeineMg, x.substance, now);
+      var t = lastCallTone(r, now);
+      var txt = r.kind === 'open' ? 'until ' + clockMs(r.time) :
+        r.kind === 'closed' ? (sameDay(r.time, now) ? 'closed ' + clockMs(r.time) : 'closed today') :
+        r.kind === 'anytime' ? 'any time' : 'skip';
+      var sel = x.id === d.id;
+      return '<button type="button" class="lc-row" data-action="set-lastcall" data-id="' + esc(x.id) + '" aria-pressed="' + sel + '">' +
+        '<span class="lc-name">' + esc(x.name) + '</span>' +
+        '<span class="lc-when lc-' + t + '">' + txt + '</span></button>';
+    }).join('');
+
+    var html =
+      '<div class="lc-head"><h2 class="eyebrow-title">Last Call</h2>' +
+      '<span class="lc-dot lc-dot-' + tone + '" aria-hidden="true"></span></div>' +
+      '<div class="lc-hero lc-hero-' + tone + '">' +
+      '<div class="lc-icon">' + icon(tone === 'closed' ? 'alertTriangle' : 'clock', 20) + '</div>' +
+      '<div><div class="lc-title">' + title + '</div><div class="lc-sub">' + sub + '</div></div></div>' +
+      '<p class="lc-budget">' + budgetText + '</p>' +
+      '<div class="lc-list" role="group" aria-label="Last call by item">' + rows + '</div>' +
+      '<p class="foot-note">Tap an item to make it your headline. Based on a ' + m.bedLabel +
+      ' bedtime and ' + target + ' mg target. <button type="button" class="link-btn lc-change" data-action="open-bedtime">Change</button></p>';
+    $$('[data-lastcall]').forEach(function (el) { el.innerHTML = html; });
   }
 
   function renderRanges() {
@@ -288,6 +375,10 @@
     m = m || metrics();
     var s = state.settings;
     var series = M.chartSeries(state.intakes, s, state.range, m.now);
+    var hd = headlineDrink();
+    var lc = M.lastCall(state.intakes, s, hd.caffeineMg, hd.substance, m.now);
+    var lastCallT = lc.kind === 'open' || lc.kind === 'closed' ? lc.time : null;
+    var showLc = lastCallT !== null && lastCallT >= series.start && lastCallT <= series.end;
     chartCards.forEach(function (c) {
       $('[data-caption]', c.el).textContent = rangeCaption();
       if (document.activeElement !== c.input) c.input.value = s.caffeineLimit;
@@ -296,13 +387,15 @@
         '<span class="legend-item"><span class="sw sw-line"></span>Caffeine Level</span>' +
         '<span class="legend-item"><span class="sw sw-limit"></span>Daily Limit (' + s.caffeineLimit + ' mg)</span>' +
         '<span class="legend-item"><span class="sw sw-target"></span>Sleep Target (' + s.targetSleepCaffeine + ' mg)</span>' +
-        (mobile ? '<span class="legend-item"><span class="sw sw-bed"></span>Bedtime</span>' : '');
+        (mobile ? '<span class="legend-item"><span class="sw sw-bed"></span>Bedtime</span>' : '') +
+        (showLc ? '<span class="legend-item"><span class="sw sw-lastcall"></span>Last call · ' + esc(hd.name) + '</span>' : '');
       CT.chart.render(c.box, {
         series: series,
         limit: s.caffeineLimit,
         target: s.targetSleepCaffeine,
         bedtime: m.bedtime.getTime(),
         showBedtime: mobile,
+        lastCall: showLc ? lastCallT : null,
         height: mobile ? 260 : 320
       });
     });
@@ -372,7 +465,7 @@
       state.add.date = e.target.value; state.add.exactTouched = true; renderTimeOptions();
     });
     $('[data-exact-time]', addPanel).addEventListener('input', function (e) {
-      state.add.time = e.target.value; state.add.exactTouched = true;
+      state.add.time = e.target.value; state.add.exactTouched = true; updateImpact();
     });
     $('[data-custom-form]', addPanel).addEventListener('submit', function (e) {
       e.preventDefault();
@@ -408,6 +501,7 @@
       chips += '<button type="button" class="chip" data-action="quick-day" data-days="' + n + '" aria-pressed="' + (state.add.date === ds) + '">' + label + '</button>';
     }
     $('[data-quick-days]', addPanel).innerHTML = chips;
+    updateImpact();
   }
 
   function searchResults(q) {
@@ -454,8 +548,28 @@
       '<div class="portion-quick">' + [10, 25, 50, 75, 100].map(function (v) {
         return '<button type="button" class="chip" data-action="portion" data-value="' + v + '" aria-pressed="' + (p === v) + '">' + v + '%</button>';
       }).join('') + '</div>' +
+      '<p class="bed-impact" data-impact>' + impactHtml(d) + '</p>' +
       '<button type="button" class="btn btn-primary btn-block" data-action="add-selected">' + icon('plus', 16) + 'Add ' + esc(d.name) + '</button>' +
       '</div>';
+  }
+
+  // What this dose, at the chosen time and portion, does to the bedtime projection.
+  function impactHtml(d) {
+    var s = state.settings, now = Date.now();
+    var dose = d.caffeineMg * state.add.portion / 100;
+    var t = Date.parse(chosenTimestamp());
+    var bed = M.nextBedtime(s.sleepTime, now).getTime();
+    if (t > bed) return icon('moon', 14) + '<span>Logged after tonight’s bedtime</span>';
+    var proj = Math.round(M.projectedWithDose(state.intakes, s, dose, d.substance, t, now));
+    var ok = proj <= s.targetSleepCaffeine;
+    return '<span class="impact-' + (ok ? 'ok' : 'warn') + '">' + icon(ok ? 'check' : 'alertTriangle', 14) +
+      'At bedtime: ' + proj + ' mg ' + (ok ? '(within your ' : '(over your ') + s.targetSleepCaffeine + ' mg target)</span>';
+  }
+
+  function updateImpact() {
+    var d = DRINKS_BY_ID[state.add.selectedId];
+    var el = $('[data-impact]', addPanel);
+    if (d && el) el.innerHTML = impactHtml(d);
   }
 
   function updatePortionLabel() {
@@ -469,6 +583,7 @@
     $$('.portion-quick .chip', addPanel).forEach(function (c) {
       c.setAttribute('aria-pressed', String(+c.getAttribute('data-value') === p));
     });
+    updateImpact();
   }
 
   function renderDrinkList() {
@@ -904,6 +1019,7 @@
         renderTimeOptions();
         break;
       case 'select-drink': selectDrink(el.getAttribute('data-id')); break;
+      case 'set-lastcall': updateSettings({ lastCallDrinkId: el.getAttribute('data-id') }); break;
       case 'clear-selection':
         state.add.selectedId = null;
         renderDrinkList();

@@ -9,6 +9,17 @@
     darkMode: 'darkMode'
   };
 
+  // Drinks that were renamed: old id -> new id, old logged name -> new name.
+  var RENAMED_IDS = { 'featured-caffeine-pouch-180-mg': 'featured-ultra-energy-pouch' };
+  var RENAMED_NAMES = { 'Caffeine Pouch (180 mg)': 'Ultra Energy Pouch' };
+
+  function renameLogged(name) {
+    for (var oldName in RENAMED_NAMES) {
+      if (name === oldName || name.indexOf(oldName + ' (') === 0) return RENAMED_NAMES[oldName] + name.slice(oldName.length);
+    }
+    return name;
+  }
+
   function read(key) {
     try {
       var raw = localStorage.getItem(key);
@@ -43,6 +54,7 @@
       pregnancyAdjustment: s.pregnancyAdjustment === true,
       smokerAdjustment: s.smokerAdjustment === true,
       oralContraceptivesAdjustment: s.oralContraceptivesAdjustment === true,
+      lastCallDrinkId: typeof s.lastCallDrinkId === 'string' ? (RENAMED_IDS[s.lastCallDrinkId] || s.lastCallDrinkId) : d.lastCallDrinkId,
       updatedAt: isFinite(s.updatedAt) ? s.updatedAt : 0
     };
   }
@@ -54,7 +66,7 @@
     if (!isFinite(ts) || !isFinite(amount) || amount < 0) return null;
     var out = {
       id: i.id || i.clientId || newId(),
-      name: String(i.name || 'Caffeine').slice(0, 120),
+      name: renameLogged(String(i.name || 'Caffeine')).slice(0, 120),
       amount: Math.round(amount),
       category: CT.model.CATEGORIES[i.category] ? i.category : 'other',
       timestamp: new Date(ts).toISOString(),
@@ -86,7 +98,8 @@
       return {
         intakes: loadIntakes(),
         settings: sanitizeSettings(read(KEYS.settings)),
-        recent: Array.isArray(recent) ? recent.filter(function (x) { return typeof x === 'string'; }).slice(0, 5) : [],
+        recent: Array.isArray(recent) ? recent.filter(function (x) { return typeof x === 'string'; })
+          .map(function (x) { return RENAMED_IDS[x] || x; }).slice(0, 5) : [],
         darkMode: loadDarkMode()
       };
     },

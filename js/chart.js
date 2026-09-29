@@ -109,6 +109,11 @@
       var bx = X(opts.bedtime);
       svg += '<line x1="' + bx + '" x2="' + bx + '" y1="' + pad.t + '" y2="' + (pad.t + ih) + '" class="chart-ref chart-ref-bed"/>';
     }
+    if (opts.lastCall != null && opts.lastCall >= s.start && opts.lastCall <= s.end) {
+      var lx = X(opts.lastCall);
+      svg += '<line x1="' + lx + '" x2="' + lx + '" y1="' + pad.t + '" y2="' + (pad.t + ih) + '" class="chart-ref chart-ref-lastcall"/>';
+      svg += '<text x="' + (lx + 4) + '" y="' + (pad.t + 10) + '" class="chart-lastcall-label">Last call</text>';
+    }
     svg += '<g class="chart-hover" style="display:none"><line class="chart-hover-line" y1="' + pad.t + '" y2="' + (pad.t + ih) + '"/>' +
       '<circle class="chart-hover-dot" r="4.5"/></g>';
     svg += '<rect class="chart-hit" x="' + pad.l + '" y="' + pad.t + '" width="' + iw + '" height="' + ih + '" fill="transparent"/>';

@@ -17,7 +17,7 @@
     // Personal staples
     ['Caffeine Pill (100 mg)', 'other', 0, 100, PILL],
     ['Caffeine Mint (80 mg)', 'other', 0, 80, MINT],
-    ['Caffeine Pouch (180 mg)', 'other', 0, 180, POUCH],
+    ['Ultra Energy Pouch', 'other', 0, 180, POUCH],
     ['Ultra Focus Pouch (Paraxanthine)', 'other', 0, 100, PX_POUCH],
     // CafTrack's default favorites
     ['Brewed Coffee (8 oz)', 'coffee', 8, 95],
@@ -304,7 +304,7 @@
     ['Caffeine Mint (40 mg)', 'other', 0, 40, MINT],
     ['Caffeine Pouch (100 mg)', 'other', 0, 100, POUCH],
     ['Caffeine Pouch (150 mg)', 'other', 0, 150, POUCH],
-    ['Ultra Energy Pouch', 'other', 0, 180, POUCH],
+    ['Caffeine Pouch (180 mg)', 'other', 0, 180, POUCH],
     ['Ultra Focus Pouch (Pre-2026, 75 mg Paraxanthine)', 'other', 0, 75, PX_POUCH],
     ['Paraxanthine Capsule (200 mg)', 'other', 0, 200, { unit: '1 capsule', substance: 'paraxanthine' }],
     ['Excedrin Migraine (2 tablets)', 'other', 0, 130],

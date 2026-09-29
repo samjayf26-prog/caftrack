@@ -11,7 +11,8 @@ A personal, zero-dependency web clone of [CafTrack](https://www.caftrack.app/), 
 - **Set Bedtime** modal with 9 PM / 10 PM / 11 PM / 12 AM presets, custom time and live projection.
 - **Add intake**: Just now, 1 hour ago, Earlier today (8:00 AM) or an exact date and time (with Today / Yesterday / N days ago shortcuts).
 - **Drink database** of ~270 coffees, teas, energy drinks, sodas and other sources, plus 5 favorites and your 5 most recent drinks. Search matches name or category and highlights the match.
-- **Pills, mints and pouches**: 100 mg pills, 80 mg mints and 180 mg pouches are pinned to Favorites.
+- **Last Call**: works backwards from your bedtime and sleep target to show the latest time you can take each of your staples (pill, mint, Ultra Energy pouch, Ultra Focus pouch), how many mg you have room for right now, and a "Last call" marker on the chart. Tap an item to make it the headline. Picking a drink in Add Intake shows what it would do to your bedtime level before you log it.
+- **Pills, mints and pouches**: 100 mg pills, 80 mg mints and 180 mg Ultra Energy pouches are pinned to Favorites.
 - **Paraxanthine tracking** (e.g. Ultra Focus pouches, 100 mg): counted toward your level and bedtime projection, marked "PX", and decaying faster than caffeine (3.1 h vs 4.1 h reference half-life, scaled by your metabolism settings). Custom entries can be caffeine or paraxanthine.
 - **Portion consumed** slider (10 to 100%) and **custom drinks**.
 - **Intake history** with 24h / 3 Days / Week / All ranges, delete with **undo**.

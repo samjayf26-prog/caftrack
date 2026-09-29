@@ -26,6 +26,7 @@
     pregnancyAdjustment: false,
     smokerAdjustment: false,
     oralContraceptivesAdjustment: false,
+    lastCallDrinkId: 'featured-caffeine-pill-100-mg',
     updatedAt: 0
   };
 
@@ -99,6 +100,44 @@
   function levelAtBedtime(intakes, s, now) {
     var bed = nextBedtime(s.sleepTime, now);
     return Math.round(levelAt(intakes, bed.getTime(), decayConstant(s)));
+  }
+
+  function rateFor(substance, s) { return decayConstant(s) / substanceMeta(substance).halfLifeRatio; }
+
+  // Level at the next bedtime if `dose` mg of `substance` were taken at time t.
+  function projectedWithDose(intakes, s, dose, substance, t, now) {
+    var bed = nextBedtime(s.sleepTime, now).getTime();
+    var base = levelAt(intakes, bed, decayConstant(s));
+    var add = t <= bed ? dose * Math.exp(-rateFor(substance, s) * (bed - t)) : 0;
+    return base + add;
+  }
+
+  // Latest time a dose can be taken while still landing at or under the sleep target.
+  // Solves base + dose * e^(-k (bed - t)) = target for t.
+  //   over:    already above target at bedtime without the dose
+  //   anytime: the dose alone fits under the remaining headroom
+  //   open:    last call is still ahead (time)
+  //   closed:  last call has passed (time)
+  function lastCall(intakes, s, dose, substance, now) {
+    now = now || Date.now();
+    var bed = nextBedtime(s.sleepTime, now).getTime();
+    var base = levelAt(intakes, bed, decayConstant(s));
+    var headroom = s.targetSleepCaffeine - base;
+    var k = rateFor(substance, s);
+    var ifNow = base + dose * Math.exp(-k * (bed - now));
+    if (headroom <= 0) return { kind: 'over', bed: bed, base: base, ifNow: ifNow };
+    if (dose <= headroom) return { kind: 'anytime', bed: bed, base: base, ifNow: ifNow };
+    var t = bed - Math.log(dose / headroom) / k;
+    return { kind: t >= now ? 'open' : 'closed', time: t, bed: bed, base: base, ifNow: ifNow };
+  }
+
+  // Most caffeine you could take right now and still meet the sleep target.
+  function budgetNow(intakes, s, now) {
+    now = now || Date.now();
+    var bed = nextBedtime(s.sleepTime, now).getTime();
+    var headroom = s.targetSleepCaffeine - levelAt(intakes, bed, decayConstant(s));
+    if (headroom <= 0) return 0;
+    return Math.floor(headroom * Math.exp(decayConstant(s) * (bed - now)));
   }
 
   function status(level, limit) {
@@ -192,6 +231,10 @@
     parseTime: parseTime,
     nextBedtime: nextBedtime,
     levelAtBedtime: levelAtBedtime,
+    rateFor: rateFor,
+    projectedWithDose: projectedWithDose,
+    lastCall: lastCall,
+    budgetNow: budgetNow,
     status: status,
     formatDuration: formatDuration,
     formatClock: formatClock,
