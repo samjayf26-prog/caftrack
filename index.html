@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CafTrack</title>
+  <meta name="description" content="Personal caffeine tracker: real-time caffeine level, metabolism forecast and sleep readiness.">
+  <meta name="theme-color" content="#f5f7fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#05070f" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="?tab=home" data-action="set-tab" data-tab="home">
+        <span class="brand-icon" data-icon="coffee" data-size="26"></span>
+        <span class="brand-name">CafTrack</span>
+      </a>
+      <div class="header-actions">
+        <button type="button" class="icon-btn" id="themeToggle" data-action="toggle-theme" aria-label="Toggle theme"></button>
+        <button type="button" class="bedtime-pill" id="bedtimeBtn" data-action="open-bedtime" aria-label="Bedtime">
+          <span data-icon="bed" data-size="18"></span><span class="bedtime-label" id="bedtimeLabel"></span>
+        </button>
+        <button type="button" class="icon-btn" data-action="open-settings" aria-label="Open settings">
+          <span data-icon="settings" data-size="18"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <!-- Desktop dashboard (>= 1024px) -->
+    <div class="desktop-grid" aria-label="Desktop dashboard">
+      <section class="col col-left">
+        <div class="card summary-card" id="summaryCard"></div>
+      </section>
+
+      <section class="col col-mid">
+        <div class="card range-card">
+          <h2 class="range-title">Time Range</h2>
+          <div class="segmented" data-range-group></div>
+        </div>
+
+        <div class="card history-card">
+          <div class="card-head">
+            <div>
+              <h2 class="eyebrow-title">Intake History</h2>
+              <p class="card-sub" data-range-caption></p>
+            </div>
+            <button type="button" class="link-btn" data-action="view-all">View all</button>
+          </div>
+          <div class="history-list" id="historyDesktop"></div>
+        </div>
+
+        <div class="card chart-card" data-chart="desktop"></div>
+      </section>
+
+      <section class="col col-right">
+        <div class="card add-card">
+          <h2 class="eyebrow-title">Add Intake</h2>
+          <p class="card-sub">Favorites first, search below.</p>
+          <div id="addPanelHome"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Mobile tabs (< 1024px) -->
+    <div class="mobile-view">
+      <div class="tab-panel" data-tab-panel="home">
+        <div class="card level-card" id="levelCard"></div>
+        <div class="card sleep-card" id="sleepCard"></div>
+      </div>
+
+      <div class="tab-panel" data-tab-panel="history" hidden>
+        <div class="card range-card">
+          <h2 class="range-title">History Range</h2>
+          <div class="segmented" data-range-group></div>
+        </div>
+        <h2 class="section-title">Intake History</h2>
+        <div class="history-list history-list-mobile" id="historyMobile"></div>
+      </div>
+
+      <div class="tab-panel" data-tab-panel="stats" hidden>
+        <div class="card range-card sticky-range">
+          <h2 class="range-title">Metabolism Stats</h2>
+          <div class="segmented" data-range-group></div>
+        </div>
+        <div class="card chart-card" data-chart="mobile"></div>
+      </div>
+    </div>
+  </main>
+
+  <button type="button" class="fab" data-action="open-add" aria-label="Add caffeine intake">
+    <span data-icon="plus" data-size="26"></span>
+  </button>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <button type="button" class="nav-item" data-action="set-tab" data-tab="home"><span data-icon="coffee" data-size="22"></span><span>Home</span></button>
+    <button type="button" class="nav-item" data-action="set-tab" data-tab="history"><span data-icon="history" data-size="22"></span><span>History</span></button>
+    <button type="button" class="nav-item" data-action="set-tab" data-tab="stats"><span data-icon="barChart" data-size="22"></span><span>Stats</span></button>
+  </nav>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+
+  <div class="crash" id="crash" hidden>
+    <div class="card crash-card">
+      <h2>Something went wrong</h2>
+      <p>CafTrack hit an unexpected error. Reloading usually fixes it.</p>
+      <button type="button" class="btn btn-primary" onclick="location.reload()">Reload</button>
+    </div>
+  </div>
+
+  <script src="js/drinks.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
