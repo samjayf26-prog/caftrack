@@ -17,7 +17,7 @@
   // Tick marks aligned to whole hours (short spans) or local midnights (long spans).
   function xTicks(start, end, width) {
     var span = end - start;
-    var maxTicks = Math.max(2, Math.floor(width / 95));
+    var maxTicks = Math.max(3, Math.floor(width / 72));
     var ticks = [];
     if (span <= 3 * M.DAY) {
       var hourSteps = [1, 2, 3, 4, 6, 8, 12, 24];
