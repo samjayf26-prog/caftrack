@@ -291,6 +291,25 @@ body.dark .lc-icon { background: #ffffff14; }
 .lc-soon { color: var(--amber-strong); }
 .lc-closed { color: var(--rose-text); }
 .lc-change { font-size: .75rem; }
+.winddown-card { padding: 20px; }
+.wd-moon { width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #ede9fe; color: #6d28d9; }
+body.dark .wd-moon { background: #4c1d9566; color: #c4b5fd; }
+.wd-row { padding: 12px 0; border-top: 1px solid var(--glass-stroke); }
+.wd-row:first-of-type { border-top: 0; }
+.wd-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.wd-name { font-weight: 600; }
+.wd-window { font-size: .8rem; font-weight: 600; color: #6d28d9; background: #ede9fe; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+body.dark .wd-window { background: #4c1d9566; color: #c4b5fd; }
+.wd-status { font-size: .85rem; font-weight: 500; margin-top: 6px; }
+.wd-ok { color: var(--emerald-strong); }
+.wd-soon { color: var(--amber-strong); }
+.wd-idle { color: var(--text-2); }
+.wd-bottom { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.wd-note { font-size: .75rem; color: var(--muted); line-height: 1.4; }
+.wd-streak { font-size: .75rem; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.wd-log { font-size: .8rem; margin-top: 6px; }
+.wd-warn { display: flex; gap: 8px; align-items: flex-start; font-size: .8rem; color: var(--amber-text); background: var(--amber-bg); padding: 10px 12px; border-radius: 12px; margin-bottom: 4px; }
+.wd-warn .icon { margin-top: 1px; }
 .bed-impact { font-size: .8rem; margin: -4px 0 12px; }
 .bed-impact span, .bed-impact { display: flex; align-items: center; gap: 6px; }
 .impact-ok { color: var(--emerald-strong); }
@@ -325,6 +344,8 @@ body.dark .link-btn { color: var(--text); }
 body.dark .cat-sky { color: var(--sky-text); }
 .cat-rose { background: var(--rose-bg); color: var(--rose-text); }
 .cat-slate { background: var(--slate-bg); color: var(--muted); }
+.cat-violet { background: #ede9fe; color: #6d28d9; }
+body.dark .cat-violet { background: #4c1d9566; color: #c4b5fd; }
 .intake-main { flex: 1; min-width: 0; }
 .intake-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .intake-time { font-size: .75rem; color: var(--muted); margin-top: 2px; }

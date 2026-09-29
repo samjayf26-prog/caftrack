@@ -11,12 +11,16 @@
   // Paraxanthine (caffeine's main metabolite) blocks adenosine receptors about as strongly as
   // caffeine but clears faster: 3.1 h vs 4.1 h half-life measured in the same subjects
   // (Lelo et al., 1986). Both go through CYP1A2, so personal factors scale them together.
+  // Sleep aids are logged for timing only and never count toward the caffeine level.
   var SUBSTANCES = {
-    caffeine: { label: 'Caffeine', short: '', halfLifeRatio: 1 },
-    paraxanthine: { label: 'Paraxanthine', short: 'PX', halfLifeRatio: 3.1 / 4.1 }
+    caffeine: { label: 'Caffeine', short: '', halfLifeRatio: 1, stimulant: true },
+    paraxanthine: { label: 'Paraxanthine', short: 'PX', halfLifeRatio: 3.1 / 4.1, stimulant: true },
+    melatonin: { label: 'Melatonin', short: 'melatonin', halfLifeRatio: 1, stimulant: false },
+    magnesium: { label: 'Magnesium', short: 'Mg', halfLifeRatio: 1, stimulant: false }
   };
 
   function substanceMeta(s) { return SUBSTANCES[s] || SUBSTANCES.caffeine; }
+  function isStimulant(intake) { return substanceMeta(intake.substance).stimulant; }
 
   var DEFAULT_SETTINGS = {
     metabolismRate: 'average',
@@ -27,6 +31,7 @@
     smokerAdjustment: false,
     oralContraceptivesAdjustment: false,
     lastCallDrinkId: 'featured-caffeine-pill-100-mg',
+    showWindDown: true,
     updatedAt: 0
   };
 
@@ -42,7 +47,8 @@
     tea: { label: 'Tea', icon: 'leaf', tone: 'emerald' },
     energy: { label: 'Energy', icon: 'zap', tone: 'sky' },
     soda: { label: 'Soda', icon: 'cupSoda', tone: 'rose' },
-    other: { label: 'Other', icon: 'cookie', tone: 'slate' }
+    other: { label: 'Other', icon: 'cookie', tone: 'slate' },
+    sleep: { label: 'Sleep aid', icon: 'moon', tone: 'violet' }
   };
 
   function categoryMeta(c) { return CATEGORIES[c] || CATEGORIES.other; }
@@ -70,7 +76,7 @@
     for (var i = 0; i < intakes.length; i++) {
       var ti = Date.parse(intakes[i].timestamp);
       var amt = Number(intakes[i].amount);
-      if (!isFinite(ti) || !isFinite(amt)) continue;
+      if (!isFinite(ti) || !isFinite(amt) || !isStimulant(intakes[i])) continue;
       var dt = t - ti;
       if (dt >= 0) sum += amt * Math.exp(-k / substanceMeta(intakes[i].substance).halfLifeRatio * dt);
     }
@@ -173,7 +179,7 @@
   function chartSeries(intakes, s, rangeValue, now) {
     now = now || Date.now();
     var k = decayConstant(s);
-    var times = intakes.map(function (i) { return Date.parse(i.timestamp); })
+    var times = intakes.filter(isStimulant).map(function (i) { return Date.parse(i.timestamp); })
       .filter(isFinite).sort(function (a, b) { return a - b; });
     var start = now - 12 * HOUR;
     if (times.length && times[0] < start) start = times[0];
@@ -223,6 +229,7 @@
     categoryMeta: categoryMeta,
     SUBSTANCES: SUBSTANCES,
     substanceMeta: substanceMeta,
+    isStimulant: isStimulant,
     findRange: findRange,
     halfLifeHours: halfLifeHours,
     decayConstant: decayConstant,

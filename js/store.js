@@ -54,6 +54,7 @@
       pregnancyAdjustment: s.pregnancyAdjustment === true,
       smokerAdjustment: s.smokerAdjustment === true,
       oralContraceptivesAdjustment: s.oralContraceptivesAdjustment === true,
+      showWindDown: s.showWindDown !== false,
       lastCallDrinkId: typeof s.lastCallDrinkId === 'string' ? (RENAMED_IDS[s.lastCallDrinkId] || s.lastCallDrinkId) : d.lastCallDrinkId,
       updatedAt: isFinite(s.updatedAt) ? s.updatedAt : 0
     };
@@ -67,7 +68,7 @@
     var out = {
       id: i.id || i.clientId || newId(),
       name: renameLogged(String(i.name || 'Caffeine')).slice(0, 120),
-      amount: Math.round(amount),
+      amount: amount < 10 ? Math.round(amount * 10) / 10 : Math.round(amount),
       category: CT.model.CATEGORIES[i.category] ? i.category : 'other',
       timestamp: new Date(ts).toISOString(),
       updatedAt: isFinite(i.updatedAt) ? i.updatedAt : ts

@@ -12,6 +12,8 @@
   var MINT = { unit: '1 mint' };
   var POUCH = { unit: '1 pouch' };
   var PX_POUCH = { unit: '1 pouch', substance: 'paraxanthine' };
+  var MELATONIN = { unit: '1 tablet', substance: 'melatonin' };
+  var MAGNESIUM = { unit: '1 serving', substance: 'magnesium' };
 
   var FEATURED = [
     // Personal staples
@@ -306,6 +308,19 @@
     ['Caffeine Pouch (150 mg)', 'other', 0, 150, POUCH],
     ['Caffeine Pouch (180 mg)', 'other', 0, 180, POUCH],
     ['Ultra Focus Pouch (Pre-2026, 75 mg Paraxanthine)', 'other', 0, 75, PX_POUCH],
+    // ---- Sleep aids (timing only; not counted as caffeine) ----
+    ['Melatonin (0.5 mg)', 'sleep', 0, 0.5, MELATONIN],
+    ['Melatonin (1 mg)', 'sleep', 0, 1, MELATONIN],
+    ['Melatonin (3 mg)', 'sleep', 0, 3, MELATONIN],
+    ['Melatonin (5 mg)', 'sleep', 0, 5, MELATONIN],
+    ['Melatonin (10 mg)', 'sleep', 0, 10, MELATONIN],
+    ['Melatonin Gummy (5 mg)', 'sleep', 0, 5, { unit: '1 gummy', substance: 'melatonin' }],
+    ['Magnesium Glycinate (200 mg)', 'sleep', 0, 200, MAGNESIUM],
+    ['Magnesium Glycinate (300 mg)', 'sleep', 0, 300, MAGNESIUM],
+    ['Magnesium Citrate (200 mg)', 'sleep', 0, 200, MAGNESIUM],
+    ['Magnesium L-Threonate (144 mg)', 'sleep', 0, 144, { unit: '3 capsules', substance: 'magnesium' }],
+    ['Magnesium Oxide (250 mg)', 'sleep', 0, 250, MAGNESIUM],
+
     ['Paraxanthine Capsule (200 mg)', 'other', 0, 200, { unit: '1 capsule', substance: 'paraxanthine' }],
     ['Excedrin Migraine (2 tablets)', 'other', 0, 130],
     ['Run Gum (1 piece)', 'other', 0, 50],

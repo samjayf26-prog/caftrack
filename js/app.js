@@ -69,6 +69,12 @@
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + time;
   }
 
+  // Small doses (melatonin) keep one decimal; everything else is whole mg.
+  function portionMg(d, p) {
+    var v = d.caffeineMg * p / 100;
+    return v < 10 ? Math.round(v * 10) / 10 : Math.round(v);
+  }
+
   function mgText(amount, substance) {
     var short = M.substanceMeta(substance).short;
     return amount + ' mg' + (short ? ' ' + short : '');
@@ -181,6 +187,7 @@
     renderSummary(m);
     renderMobileHome(m);
     renderLastCall(m);
+    renderWindDown(m);
     renderRanges();
     renderHistory();
     renderCharts(m);
@@ -316,6 +323,101 @@
       '<p class="foot-note">Tap an item to make it your headline. Based on a ' + m.bedLabel +
       ' bedtime and ' + target + ' mg target. <button type="button" class="link-btn lc-change" data-action="open-bedtime">Change</button></p>';
     $$('[data-lastcall]').forEach(function (el) { el.innerHTML = html; });
+  }
+
+  // ---------- Wind-down (sleep aids) ----------
+  // Windows are minutes before bedtime. okMin/okMax is the range counted as "on time".
+  var AIDS = [
+    { key: 'melatonin', label: 'Melatonin', from: 60, to: 30, okMin: 20, okMax: 90,
+      note: 'Starts working in 20–40 min and peaks about an hour after you take it.' },
+    { key: 'magnesium', label: 'Magnesium', from: 60, to: 30, okMin: 0, okMax: 120,
+      note: 'Benefits build with nightly use over 2+ weeks, so consistency matters more than the minute.' }
+  ];
+
+  function aidFor(substance) {
+    for (var i = 0; i < AIDS.length; i++) if (AIDS[i].key === substance) return AIDS[i];
+    return null;
+  }
+
+  // Tonight's bedtime; for 3 hours after bedtime it still refers to the one just passed.
+  function refBedtime(now) {
+    var next = M.nextBedtime(state.settings.sleepTime, now).getTime();
+    return now - (next - M.DAY) < 3 * M.HOUR ? next - M.DAY : next;
+  }
+
+  function shortClock(t) { return new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+
+  function windowText(aid, bed) {
+    return shortClock(bed - aid.from * M.MINUTE) + '–' + shortClock(bed - aid.to * M.MINUTE);
+  }
+
+  function nightsTaken(key, now) {
+    var nights = {};
+    state.intakes.forEach(function (i) {
+      var t = Date.parse(i.timestamp);
+      // Shift by 6 h so an after-midnight dose counts for the night before.
+      if (i.substance === key && now - t <= 7 * M.DAY) nights[localDateStr(new Date(t - 6 * M.HOUR))] = 1;
+    });
+    return Object.keys(nights).length;
+  }
+
+  function aidStatus(aid, bed, now) {
+    var start = bed - aid.from * M.MINUTE, end = bed - aid.to * M.MINUTE;
+    var taken = state.intakes.filter(function (i) {
+      var t = Date.parse(i.timestamp);
+      return i.substance === aid.key && t >= bed - 8 * M.HOUR && t <= bed + 3 * M.HOUR;
+    });
+    if (taken.length) {
+      var last = taken[0]; // intakes are sorted newest first
+      var mins = Math.round((bed - Date.parse(last.timestamp)) / M.MINUTE);
+      var when = shortClock(Date.parse(last.timestamp));
+      var dose = mgText(last.amount, last.substance);
+      if (mins >= aid.okMin && mins <= aid.okMax) return { tone: 'ok', text: 'Taken ' + when + ' · ' + dose + ' · ' + mins + ' min before bed' };
+      if (mins > aid.okMax) return { tone: 'soon', text: 'Taken ' + when + ' · ' + dose + ' · earlier than ideal' };
+      return { tone: 'soon', text: 'Taken ' + when + ' · ' + dose + ' · ' + (mins < 0 ? 'after bedtime' : 'a bit late') };
+    }
+    if (now < start) return { tone: 'idle', text: 'Take ' + windowText(aid, bed) + ' · in ' + M.formatDuration(start - now) };
+    if (now <= end) return { tone: 'ok', text: 'Take now · window ends ' + shortClock(end) };
+    if (now <= bed) return { tone: 'soon', text: 'Window passed · taking it now still helps, just a little later' };
+    return { tone: 'idle', text: 'Not taken tonight' };
+  }
+
+  function renderWindDown(m) {
+    var els = $$('[data-winddown]');
+    var show = state.settings.showWindDown;
+    els.forEach(function (el) { el.hidden = !show; });
+    if (!show) return;
+    var now = m.now, bed = refBedtime(now);
+    var rows = AIDS.map(function (aid) {
+      var st = aidStatus(aid, bed, now);
+      var extra = aid.key === 'magnesium' ? '<span class="wd-streak">' + nightsTaken('magnesium', now) + ' of last 7 nights</span>' : '';
+      return '<div class="wd-row">' +
+        '<div class="wd-top"><span class="wd-name">' + aid.label + '</span>' +
+        '<span class="wd-window">' + windowText(aid, bed) + '</span></div>' +
+        '<div class="wd-status wd-' + st.tone + '">' + esc(st.text) + '</div>' +
+        '<div class="wd-bottom"><span class="wd-note">' + aid.note + '</span>' + extra + '</div>' +
+        '<button type="button" class="link-btn wd-log" data-action="find-aid" data-q="' + aid.key + '">Log ' + aid.label.toLowerCase() + '</button>' +
+        '</div>';
+    }).join('');
+    var caffeineWarn = !m.sleepOk ?
+      '<p class="wd-warn">' + icon('alertTriangle', 14) + '<span>Caffeine is projected at ' + m.atSleep + ' mg at bedtime, over your target. Sleep aids won’t cancel that out.</span></p>' : '';
+    var html =
+      '<div class="lc-head"><div><h2 class="eyebrow-title">Wind-Down</h2>' +
+      '<p class="card-sub">Sleep aid timing for your ' + shortClock(bed) + ' bedtime</p></div>' +
+      '<span class="wd-moon">' + icon('moon', 18) + '</span></div>' +
+      caffeineWarn + rows +
+      '<p class="foot-note">Sleep aids are tracked for timing only and don’t count toward your caffeine level.</p>';
+    els.forEach(function (el) { el.innerHTML = html; });
+  }
+
+  function openSearch(q) {
+    var input = $('[data-search]', addPanel);
+    input.value = q;
+    state.add.query = q;
+    state.add.selectedId = null;
+    renderDrinkList();
+    if (isDesktop()) input.focus();
+    else openModal('add');
   }
 
   function renderRanges() {
@@ -516,7 +618,7 @@
     matches.sort(function (a, b) {
       var ai = a.name.toLowerCase().indexOf(q), bi = b.name.toLowerCase().indexOf(q);
       var ar = ai === 0 ? 0 : ai > 0 ? 1 : 2, br = bi === 0 ? 0 : bi > 0 ? 1 : 2;
-      return ar - br || (a.id.indexOf('featured-') === 0 ? -1 : 0) - (b.id.indexOf('featured-') === 0 ? -1 : 0) || a.name.localeCompare(b.name);
+      return ar - br || (a.id.indexOf('featured-') === 0 ? -1 : 0) - (b.id.indexOf('featured-') === 0 ? -1 : 0) || a.name.localeCompare(b.name, undefined, { numeric: true });
     });
     return matches.slice(0, 60);
   }
@@ -543,7 +645,7 @@
     return '<div class="confirm" data-confirm>' +
       '<div class="confirm-head"><div><div class="drink-name">' + esc(d.name) + '</div><div class="drink-meta">' + esc(servingText(d)) + '</div></div>' +
       '<button type="button" class="close-btn" data-action="clear-selection" aria-label="Clear selection">' + icon('x', 16) + '</button></div>' +
-      '<div class="portion-row"><label for="portion-range">Portion consumed</label><strong data-portion-label>' + p + '% · ' + mgText(Math.round(d.caffeineMg * p / 100), d.substance) + '</strong></div>' +
+      '<div class="portion-row"><label for="portion-range">Portion consumed</label><strong data-portion-label>' + p + '% · ' + mgText(portionMg(d, p), d.substance) + '</strong></div>' +
       '<input class="range" id="portion-range" type="range" min="10" max="100" step="5" value="' + p + '" data-portion>' +
       '<div class="portion-quick">' + [10, 25, 50, 75, 100].map(function (v) {
         return '<button type="button" class="chip" data-action="portion" data-value="' + v + '" aria-pressed="' + (p === v) + '">' + v + '%</button>';
@@ -556,6 +658,15 @@
   // What this dose, at the chosen time and portion, does to the bedtime projection.
   function impactHtml(d) {
     var s = state.settings, now = Date.now();
+    var aid = aidFor(d.substance);
+    if (aid) {
+      var bedRef = refBedtime(now);
+      var ideal = windowText(aid, bedRef);
+      var mins = Math.round((bedRef - Date.parse(chosenTimestamp())) / M.MINUTE);
+      var good = mins >= aid.okMin && mins <= aid.okMax;
+      return '<span class="impact-' + (good ? 'ok' : 'warn') + '">' + icon(good ? 'check' : 'clock', 14) +
+        (good ? 'Good timing: ' + mins + ' min before bed' : 'Best taken ' + ideal) + '</span>';
+    }
     var dose = d.caffeineMg * state.add.portion / 100;
     var t = Date.parse(chosenTimestamp());
     var bed = M.nextBedtime(s.sleepTime, now).getTime();
@@ -577,7 +688,7 @@
     if (!d) return;
     var p = state.add.portion;
     var lbl = $('[data-portion-label]', addPanel);
-    if (lbl) lbl.textContent = p + '% · ' + mgText(Math.round(d.caffeineMg * p / 100), d.substance);
+    if (lbl) lbl.textContent = p + '% · ' + mgText(portionMg(d, p), d.substance);
     var range = $('[data-portion]', addPanel);
     if (range && +range.value !== p) range.value = p;
     $$('.portion-quick .chip', addPanel).forEach(function (c) {
@@ -634,7 +745,7 @@
     var p = state.add.portion;
     addIntake({
       name: d.name + (p !== 100 ? ' (' + p + '%)' : ''),
-      amount: Math.max(0, Math.round(d.caffeineMg * p / 100)),
+      amount: Math.max(0, portionMg(d, p)),
       category: d.category,
       substance: d.substance,
       timestamp: chosenTimestamp()
@@ -754,6 +865,8 @@
       checkRow('smokerAdjustment', 'Smoker (faster metabolism)', d) +
       checkRow('oralContraceptivesAdjustment', 'Oral contraceptives (slower metabolism)', d) +
       '<p class="effective" data-effective>' + effectiveText(d) + '</p></div>' +
+      '<div class="panel"><h3>Sleep Aids</h3>' +
+      checkRow('showWindDown', 'Show the Wind-Down card (melatonin and magnesium timing)', d) + '</div>' +
       '<div class="panel"><h3>Appearance</h3><div class="row-between"><span>Dark Mode</span>' +
       '<button type="button" class="icon-btn" data-action="toggle-theme" aria-label="Toggle dark mode" aria-pressed="' + state.darkMode + '">' + icon(state.darkMode ? 'sun' : 'moon', 18) + '</button></div></div>' +
       '<div class="panel"><h3>About Caffeine</h3><button type="button" class="btn btn-outline btn-block" data-action="open-about">Click here to learn more about caffeine</button></div>' +
@@ -799,7 +912,8 @@
       targetSleepCaffeine: d.targetSleepCaffeine,
       pregnancyAdjustment: d.pregnancyAdjustment,
       smokerAdjustment: d.smokerAdjustment,
-      oralContraceptivesAdjustment: d.oralContraceptivesAdjustment
+      oralContraceptivesAdjustment: d.oralContraceptivesAdjustment,
+      showWindDown: d.showWindDown
     });
     closeModal();
     showToast('Settings saved');
@@ -864,6 +978,10 @@
       '<h3>' + icon('leaf', 18) + 'Paraxanthine</h3>' +
       '<p>Paraxanthine is the main compound your liver turns caffeine into (about 80% of it). It blocks adenosine receptors about as strongly as caffeine, so it keeps you alert in a similar way, but it clears faster: roughly a 3.1-hour half-life versus 4.1 hours for caffeine in the same people. Some supplements and pouches (such as Ultra Focus) contain it instead of caffeine.</p>' +
       '<p>CafTrack counts paraxanthine toward your level and bedtime projection (marked “PX”), decaying about 24% faster than your caffeine half-life. Human sleep studies on paraxanthine supplements are still limited, so treat its sleep effect as similar to caffeine until proven otherwise.</p>' +
+      '<h3>' + icon('moon', 18) + 'Melatonin and magnesium</h3>' +
+      '<p>Melatonin is best taken 30–60 minutes before bed: it starts working in 20–40 minutes and peaks about an hour after you take it. Low doses (0.5–3 mg) usually work as well as high ones with less next-day grogginess; 10 mg is a common upper limit. Sleep medicine guidelines don’t routinely recommend it for chronic insomnia, so expect a modest effect.</p>' +
+      '<p>Magnesium (glycinate is gentlest on the stomach) is usually taken 30–60 minutes before bed. Evidence for sleep is limited and strongest in people who are low in magnesium; benefits build over 2+ weeks of nightly use. Keep supplements at or under 350 mg a day unless a clinician advises otherwise.</p>' +
+      '<p>Neither undoes caffeine. The Wind-Down card shows each one’s window for your bedtime and whether you took it on time.</p>' +
       '<p class="disclaimer">Estimates only, based on published averages. This app is not a medical device; individual responses vary, so talk to a clinician about your own limits.</p>' +
       '</div>';
   }
@@ -1019,6 +1137,7 @@
         renderTimeOptions();
         break;
       case 'select-drink': selectDrink(el.getAttribute('data-id')); break;
+      case 'find-aid': openSearch(el.getAttribute('data-q')); break;
       case 'set-lastcall': updateSettings({ lastCallDrinkId: el.getAttribute('data-id') }); break;
       case 'clear-selection':
         state.add.selectedId = null;
